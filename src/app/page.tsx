@@ -1,103 +1,168 @@
-import Image from "next/image";
+"use client";
+import TaskTable from "./components/tasktable";
+import TaskForm from "./components/taskform";
+import { useTasksQuery } from "./hooks/usetask";
+import { api } from "./lib/api";
+import type { Task } from "./types";
+import { QueryClient, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Container,
+  Typography,
+  CircularProgress,
+} from "@mui/material";
 
-export default function Home() {
+export default function TasksPage() {
+  const { data: tasks = [], isLoading } = useTasksQuery({
+    includeSubtasks: true,
+    limit: 100,
+  });
+
+  const [openForm, setOpenForm] = useState(false);
+  const [editing, setEditing] = useState<Partial<Task> | undefined>(undefined);
+  const [parents, setParents] = useState<{ id: number; title: string }[]>([]);
+  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
+  const qc = useQueryClient();
+
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const u = await api.getUsers();
+        if (isMounted)
+          setUsers(
+            u.map((x) => ({ id: x.id, name: x.firstname + " " + x.lastname }))
+          );
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const r = await api.getTasks("include=subtasks&page=1&limit=100");
+        if (isMounted) {
+          const ps = r.data.map((t: Task) => ({ id: t.id, title: t.title }));
+          setParents(ps);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const createMutation = useMutation<Task, Error, Partial<Task>>({
+    mutationFn: (payload) => api.createTask(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+
+  const updateMutation = useMutation<Task, Error, { id: number; payload: Partial<Task> }>({
+    mutationFn: ({ id, payload }) => api.updateTask(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+
+  const deleteMutation = useMutation<void, Error, number>({
+    mutationFn: (id) => api.deleteTask(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+
+  const handleCreate = async (payload: Partial<Task>) => {
+    await createMutation.mutateAsync(payload);
+  };
+
+  const handleEdit = (task: Task) => {
+    setEditing(task);
+    setOpenForm(true);
+  };
+
+  const handleUpdate = async (payload: Partial<Task>) => {
+    if (!editing?.id) return;
+    await updateMutation.mutateAsync({ id: editing.id, payload });
+    setEditing(undefined);
+  };
+
+  const handleDelete = async (task: Task) => {
+    await deleteMutation.mutateAsync(task.id);
+  };
+
+  const handleCreateSubtask = (parent: Task) => {
+    setEditing({ parentId: parent.id });
+    setOpenForm(true);
+  };
+
+  if (isLoading) {
+    return (
+      <Container
+        sx={{
+          py: 6,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "70vh",
+        }}
+      >
+        <CircularProgress size={60} thickness={4} />
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
+          Loading tasks...
+        </Typography>
+      </Container>
+    );
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <Container sx={{ py: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h5">Tasks</Typography>
+        <Button
+          variant="contained"
+          onClick={() => {
+            setEditing(undefined);
+            setOpenForm(true);
+          }}
+        >
+          Create task
+        </Button>
+      </Box>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <TaskTable
+        tasks={tasks}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onCreateSubtask={handleCreateSubtask}
+      />
+
+      <TaskForm
+        open={openForm}
+        onClose={() => {
+          setOpenForm(false);
+          setEditing(undefined);
+        }}
+        onSave={async (payload) => {
+          if (editing?.id) {
+            await handleUpdate(payload);
+          } else {
+            await handleCreate({ ...payload });
+          }
+        }}
+        initial={editing}
+        users={users}
+        parents={parents}
+      />
+    </Container>
   );
 }
