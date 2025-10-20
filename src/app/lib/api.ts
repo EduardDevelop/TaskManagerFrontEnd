@@ -1,7 +1,7 @@
 import type { Task } from "../types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://taskmanager-backend-je56x7h69-edward-numpaques-projects.vercel.app";
+ 
 export const api = {
   getTasks: async (query: string): Promise<{ data: Task[] }> => {
     const res = await fetch(`${API_URL}/api/tasks?${query}`);
@@ -24,6 +24,7 @@ export const api = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      
     });
     if (!res.ok) throw new Error("Failed to update task");
     return res.json();
