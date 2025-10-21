@@ -9,7 +9,7 @@ export function initSocket() {
   if (socket) return socket;
   socket = io("https://taskmanagerbackend-7ase.onrender.com", {
     transports: ["websocket"],
-  });s
+  });
   return socket;
 }
 
