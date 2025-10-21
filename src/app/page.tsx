@@ -4,7 +4,7 @@ import TaskForm from "./components/taskform";
 import { useTasksQuery } from "./hooks/usetask";
 import { api } from "./lib/api";
 import type { Task } from "./types";
-import { QueryClient, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -13,6 +13,7 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import Swal from "sweetalert2";
 
 export default function TasksPage() {
   const { data: tasks = [], isLoading } = useTasksQuery({
@@ -26,7 +27,6 @@ export default function TasksPage() {
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const qc = useQueryClient();
 
-
   useEffect(() => {
     let isMounted = true;
 
@@ -39,6 +39,11 @@ export default function TasksPage() {
           );
       } catch (e) {
         console.error(e);
+        Swal.fire({
+          icon: "error",
+          title: "Error al cargar usuarios",
+          text: (e as Error).message || "No se pudieron cargar los usuarios",
+        });
       }
 
       try {
@@ -49,6 +54,11 @@ export default function TasksPage() {
         }
       } catch (e) {
         console.error(e);
+        Swal.fire({
+          icon: "error",
+          title: "Error al cargar tareas",
+          text: (e as Error).message || "No se pudieron cargar las tareas",
+        });
       }
     };
 
@@ -58,19 +68,73 @@ export default function TasksPage() {
     };
   }, []);
 
+  const closeForm = () => {
+    setOpenForm(false);
+    setEditing(undefined);
+  };
+
   const createMutation = useMutation<Task, Error, Partial<Task>>({
     mutationFn: (payload) => api.createTask(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: async () => {
+      closeForm(); // Cerrar antes del alert
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await Swal.fire({
+        icon: "success",
+        title: "Tarea creada exitosamente",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    },
+    onError: async (e) => {
+      closeForm(); // Cerrar antes del alert
+      await Swal.fire({
+        icon: "error",
+        title: "Error al crear tarea",
+        text: e.message || "No se pudo crear la tarea",
+      });
+    },
   });
 
   const updateMutation = useMutation<Task, Error, { id: number; payload: Partial<Task> }>({
     mutationFn: ({ id, payload }) => api.updateTask(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: async () => {
+      closeForm(); // Cerrar antes del alert
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await Swal.fire({
+        icon: "success",
+        title: "Tarea actualizada correctamente",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    },
+    onError: async (e) => {
+      closeForm(); // Cerrar antes del alert
+      await Swal.fire({
+        icon: "error",
+        title: "Error al actualizar tarea",
+        text: e.message || "No se pudo actualizar la tarea",
+      });
+    },
   });
 
   const deleteMutation = useMutation<void, Error, number>({
     mutationFn: (id) => api.deleteTask(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      await Swal.fire({
+        icon: "success",
+        title: "Tarea eliminada",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    },
+    onError: async (e) => {
+      await Swal.fire({
+        icon: "error",
+        title: "Error al eliminar tarea",
+        text: e.message || "No se pudo eliminar la tarea",
+      });
+    },
   });
 
   const handleCreate = async (payload: Partial<Task>) => {
@@ -85,11 +149,21 @@ export default function TasksPage() {
   const handleUpdate = async (payload: Partial<Task>) => {
     if (!editing?.id) return;
     await updateMutation.mutateAsync({ id: editing.id, payload });
-    setEditing(undefined);
   };
 
   const handleDelete = async (task: Task) => {
-    await deleteMutation.mutateAsync(task.id);
+    const confirm = await Swal.fire({
+      title: "¿Eliminar tarea?",
+      text: "Esta acción no se puede deshacer",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (confirm.isConfirmed) {
+      await deleteMutation.mutateAsync(task.id);
+    }
   };
 
   const handleCreateSubtask = (parent: Task) => {
@@ -148,10 +222,7 @@ export default function TasksPage() {
 
       <TaskForm
         open={openForm}
-        onClose={() => {
-          setOpenForm(false);
-          setEditing(undefined);
-        }}
+        onClose={closeForm}
         onSave={async (payload) => {
           if (editing?.id) {
             await handleUpdate(payload);
