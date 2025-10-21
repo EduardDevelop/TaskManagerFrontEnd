@@ -1,3 +1,4 @@
+// src/components/TaskForm.tsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -8,8 +9,8 @@ import {
   TextField,
   MenuItem,
 } from "@mui/material";
-import Swal from "sweetalert2";
 import type { Task, TaskStatus } from "../types";
+import { api } from "../lib/api";
 
 const STATUS_OPTIONS = ["TO_DO", "IN_PROGRESS", "COMPLETED"] as const;
 
@@ -34,9 +35,7 @@ export default function TaskForm({
   const [assigneeId, setAssigneeId] = useState<number | null | "">(
     initial?.assigneeId ?? ""
   );
-  const [parentId, setParentId] = useState<number | null | "">(
-    initial?.parentId ?? ""
-  );
+  const [parentId, setParentId] = useState<number | null | "">(initial?.parentId ?? "");
 
   useEffect(() => {
     setTitle(initial?.title ?? "");
@@ -47,11 +46,7 @@ export default function TaskForm({
   }, [initial, open]);
 
   const handleSubmit = async () => {
-    if (!title || title.trim().length < 3) {
-      Swal.fire("Validation error", "Title must have at least 3 characters.", "warning");
-      return;
-    }
-
+    if (!title || title.trim().length < 3) return alert("Title min 3 chars");
     const payload: Partial<Task> = {
       title: title.trim(),
       description: description || null,
@@ -59,14 +54,8 @@ export default function TaskForm({
       assigneeId: assigneeId === "" ? null : (assigneeId as number),
       parentId: parentId === "" ? null : (parentId as number),
     };
-
-    try {
-      await onSave(payload);
-      Swal.fire("Success", "Task saved successfully", "success");
-      onClose();
-    } catch (err: any) {
-      Swal.fire("Error", err.message || "Failed to save task", "error");
-    }
+    await onSave(payload);
+    onClose();
   };
 
   return (
@@ -95,9 +84,7 @@ export default function TaskForm({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleSubmit}>
-          {initial?.id ? "Save" : "Create"}
-        </Button>
+        <Button variant="contained" onClick={handleSubmit}>{initial?.id ? "Save" : "Create"}</Button>
       </DialogActions>
     </Dialog>
   );
