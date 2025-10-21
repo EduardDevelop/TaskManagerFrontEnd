@@ -1,6 +1,6 @@
 import type { Task } from "../types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = "https://taskmanagerbackend-7ase.onrender.com";
 export const api = {
   getTasks: async (query: string): Promise<{ data: Task[] }> => {
     const res = await fetch(`${API_URL}/api/tasks?${query}`);
