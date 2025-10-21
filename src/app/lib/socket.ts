@@ -7,7 +7,7 @@ let socket: SocketInstance | null = null;
 
 export function initSocket() {
   if (socket) return socket;
-  socket = io(process.env.NEXT_PUBLIC_API_WS ?? "http://localhost:3000", {
+  socket = io(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000", {
     transports: ["websocket"],
   });
   return socket;
